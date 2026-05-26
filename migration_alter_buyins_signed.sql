@@ -1,0 +1,2 @@
+ALTER TABLE players
+  MODIFY buyins INT NOT NULL DEFAULT 0;

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quản lý phiên Pokémon</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar" aria-label="Quản lý phiên">
+        <div>
+          <p class="eyebrow">Quản lý</p>
+          <h1>Sổ kết Pokémon</h1>
+        </div>
+        <div class="session-controls">
+          <label for="sessionSelect">Phiên</label>
+          <select id="sessionSelect"></select>
+          <button id="newSessionBtn" type="button">Phiên mới</button>
+        </div>
+      </section>
+
+      <section class="toolbar" aria-label="Thông tin phiên">
+        <div class="field wide">
+          <label for="sessionName">Tên phiên</label>
+          <input id="sessionName" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="buyinValue">Hệ số 1 lượt</label>
+          <input id="buyinValue" type="number" min="0" step="1000" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="sessionDate">Ngày</label>
+          <input id="sessionDate" type="date">
+        </div>
+      </section>
+
+      <section class="summary-grid" aria-label="Tổng kết phiên đang chọn">
+        <article class="metric">
+          <span>Tổng người chơi</span>
+          <strong id="totalPlayers">0</strong>
+        </article>
+        <article class="metric">
+          <span>Tổng lượt khởi động</span>
+          <strong id="totalBuyinCount">0</strong>
+        </article>
+        <article class="metric">
+          <span>Tổng điểm đầu</span>
+          <strong id="totalStartPoints">0</strong>
+        </article>
+        <article class="metric">
+          <span>Tổng điểm chốt</span>
+          <strong id="totalFinalPoints">0</strong>
+        </article>
+        <article class="metric diff" id="differenceMetric">
+          <span>Chênh điểm đầu / chốt</span>
+          <strong id="totalDifference">0</strong>
+        </article>
+      </section>
+
+      <section class="add-player" aria-label="Thêm người chơi">
+        <div class="field wide">
+          <label for="playerName">Người chơi</label>
+          <input id="playerName" type="text" placeholder="Nhập tên" autocomplete="off">
+        </div>
+        <div class="field small">
+          <label for="playerBuyins">Lượt khởi động</label>
+          <input id="playerBuyins" type="number" step="1" value="1" inputmode="numeric">
+        </div>
+        <button id="addPlayerBtn" type="button">Thêm</button>
+        <button id="addTigerRiceBtn" class="ghost preset-button" type="button">Thêm - Ngũ hổ vồ xôi</button>
+      </section>
+
+      <section class="table-section" aria-label="Danh sách người chơi">
+        <div class="section-heading">
+          <h2>Người chơi</h2>
+          <button id="clearSessionBtn" class="ghost" type="button">Xóa dữ liệu phiên</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th>Lượt khởi động</th>
+                <th>Điểm đầu</th>
+                <th>Điểm chốt</th>
+                <th>Kết quả</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="playersBody"></tbody>
+          </table>
+          <p id="emptyState" class="empty-state">Chưa có người chơi trong phiên này.</p>
+        </div>
+      </section>
+
+      <section class="table-section" aria-label="Thống kê lịch sử">
+        <div class="section-heading">
+          <h2>Thống kê lịch sử</h2>
+          <p class="section-note">Chỉ tính các phiên đang hiện.</p>
+        </div>
+        <div class="summary-grid compact" aria-label="Tổng thống kê toàn bộ">
+          <article class="metric">
+            <span>Phiên đang tính</span>
+            <strong id="historyActiveSessions">0</strong>
+          </article>
+          <article class="metric">
+            <span>Tổng lượt</span>
+            <strong id="historyBuyinCount">0</strong>
+          </article>
+          <article class="metric">
+            <span>Tổng điểm đầu</span>
+            <strong id="historyStartPoints">0</strong>
+          </article>
+          <article class="metric">
+            <span>Tổng điểm chốt</span>
+            <strong id="historyFinalPoints">0</strong>
+          </article>
+          <article class="metric diff" id="historyDifferenceMetric">
+            <span>Chênh điểm toàn bộ</span>
+            <strong id="historyDifference">0</strong>
+          </article>
+        </div>
+        <div class="history-layout">
+          <div class="table-wrap">
+            <h3>Thống kê từng người</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Người chơi</th>
+                  <th>Tổng lượt</th>
+                  <th>Tổng điểm đầu</th>
+                  <th>Tổng điểm chốt</th>
+                  <th>Kết quả</th>
+                </tr>
+              </thead>
+              <tbody id="personStatsBody"></tbody>
+            </table>
+            <p id="personStatsEmpty" class="empty-state">Chưa có dữ liệu thống kê.</p>
+          </div>
+          <div class="table-wrap">
+            <h3>Lịch sử theo ngày</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>Phiên</th>
+                  <th>Điểm đầu</th>
+                  <th>Điểm chốt</th>
+                  <th>Chênh điểm</th>
+                  <th>Trạng thái</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="historyBody"></tbody>
+            </table>
+            <p id="historyEmpty" class="empty-state">Chưa có lịch sử.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <template id="playerRowTemplate">
+      <tr>
+        <td data-label="Tên">
+          <input class="name-input" type="text" autocomplete="off">
+        </td>
+        <td data-label="Lượt khởi động">
+          <input class="buyins-input number-input" type="number" step="1" inputmode="numeric">
+        </td>
+        <td data-label="Điểm đầu" class="points-cell start-points"></td>
+        <td data-label="Điểm chốt">
+          <input class="final-input number-input" type="number" min="0" step="1000" inputmode="numeric">
+        </td>
+        <td data-label="Kết quả" class="result-cell"></td>
+        <td class="actions-cell">
+          <button class="delete-player ghost" type="button" aria-label="Xóa người chơi">Xóa</button>
+        </td>
+      </tr>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

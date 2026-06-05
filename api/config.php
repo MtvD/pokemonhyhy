@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-const DB_HOST = 'localhost';
-const DB_NAME = 'pokelipi_db';
-const DB_USER = 'pokelipi_mtvd';
-const DB_PASS = 'Vienduong@1001';
-
+// Đọc từ environment variables (Docker truyền vào)
+// Fallback về giá trị mặc định nếu không có env var
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_NAME', getenv('DB_NAME') ?: 'pokelipi_db');
+define('DB_USER', getenv('DB_USER') ?: 'pokelipi_mtvd');
+define('DB_PASS', getenv('DB_PASS') ?: 'Vienduong@1001');

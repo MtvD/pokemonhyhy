@@ -3,14 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Testing CI/CD - Quản lý phiên Pokémon</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Quản lý phiên Pokémon</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <main class="app-shell">
       <section class="topbar" aria-label="Quản lý phiên">
         <div>
-          <p class="eyebrow">Testing CI/CD - Quản lý</p>
+          <p class="eyebrow">Quản lý 2.0</p>
           <h1>Sổ kết Pokémon</h1>
         </div>
         <div class="session-controls">
@@ -27,7 +30,7 @@
         </div>
         <div class="field">
           <label for="buyinValue">Hệ số 1 lượt</label>
-          <input id="buyinValue" type="number" min="0" step="1000" inputmode="numeric">
+          <input id="buyinValue" type="number" min="0" step="100" inputmode="numeric" placeholder="600">
         </div>
         <div class="field">
           <label for="sessionDate">Ngày</label>
@@ -65,7 +68,11 @@
         </div>
         <div class="field small">
           <label for="playerBuyins">Lượt khởi động</label>
-          <input id="playerBuyins" type="number" step="1" value="1" inputmode="numeric">
+          <div class="stepper-group">
+            <button type="button" class="stepper-btn" id="playerBuyinsMinus" aria-label="Giảm lượt">−</button>
+            <input id="playerBuyins" type="number" step="1" value="1" inputmode="numeric">
+            <button type="button" class="stepper-btn" id="playerBuyinsPlus" aria-label="Tăng lượt">+</button>
+          </div>
         </div>
         <button id="addPlayerBtn" type="button">Thêm</button>
         <button id="addTigerRiceBtn" class="ghost preset-button" type="button">Thêm - Ngũ hổ vồ xôi</button>
@@ -74,7 +81,10 @@
       <section class="table-section" aria-label="Danh sách người chơi">
         <div class="section-heading">
           <h2>Người chơi</h2>
-          <button id="clearSessionBtn" class="ghost" type="button">Xóa dữ liệu phiên</button>
+          <div class="section-heading-actions">
+            <button id="endSessionBtn" type="button">Kết thúc phiên</button>
+            <button id="clearSessionBtn" class="ghost" type="button">Xóa dữ liệu phiên</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -158,6 +168,17 @@
           </div>
         </div>
       </section>
+
+      <!-- Modal chi tiết phiên -->
+      <dialog id="sessionDetailModal" class="session-detail-modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="modalTitle">Chi tiết phiên</h3>
+            <button type="button" id="closeModalBtn" class="ghost" aria-label="Đóng">✕</button>
+          </div>
+          <div class="modal-body" id="modalBody"></div>
+        </div>
+      </dialog>
     </main>
 
     <template id="playerRowTemplate">
@@ -166,11 +187,19 @@
           <input class="name-input" type="text" autocomplete="off">
         </td>
         <td data-label="Lượt khởi động">
-          <input class="buyins-input number-input" type="number" step="1" inputmode="numeric">
+          <div class="stepper-group inline">
+            <button type="button" class="stepper-btn buyins-minus" aria-label="Giảm lượt">−</button>
+            <input class="buyins-input number-input" type="number" step="1" inputmode="numeric">
+            <button type="button" class="stepper-btn buyins-plus" aria-label="Tăng lượt">+</button>
+          </div>
         </td>
         <td data-label="Điểm đầu" class="points-cell start-points"></td>
         <td data-label="Điểm chốt">
-          <input class="final-input number-input" type="number" min="0" step="1000" inputmode="numeric">
+          <div class="stepper-group inline">
+            <button type="button" class="stepper-btn final-minus" aria-label="Giảm điểm">−</button>
+            <input class="final-input number-input" type="number" step="100" inputmode="numeric">
+            <button type="button" class="stepper-btn final-plus" aria-label="Tăng điểm">+</button>
+          </div>
         </td>
         <td data-label="Kết quả" class="result-cell"></td>
         <td class="actions-cell">

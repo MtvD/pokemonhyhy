@@ -1,6 +1,8 @@
 (function () {
   const ACTIVE_SESSION_KEY = "pokemon-session-manager:active-session";
   const API_BASE = "api";
+  const DEFAULT_BUYIN_VALUE = 600;
+  const FINAL_STEP = 100;
   const currency = new Intl.NumberFormat("vi-VN");
 
   const elements = {
@@ -11,28 +13,35 @@
     sessionDate: document.querySelector("#sessionDate"),
     playerName: document.querySelector("#playerName"),
     playerBuyins: document.querySelector("#playerBuyins"),
+    playerBuyinsMinus: document.querySelector("#playerBuyinsMinus"),
+    playerBuyinsPlus: document.querySelector("#playerBuyinsPlus"),
     addPlayerBtn: document.querySelector("#addPlayerBtn"),
     addTigerRiceBtn: document.querySelector("#addTigerRiceBtn"),
     clearSessionBtn: document.querySelector("#clearSessionBtn"),
+    endSessionBtn: document.querySelector("#endSessionBtn"),
     playersBody: document.querySelector("#playersBody"),
     emptyState: document.querySelector("#emptyState"),
     rowTemplate: document.querySelector("#playerRowTemplate"),
     totalPlayers: document.querySelector("#totalPlayers"),
     totalBuyinCount: document.querySelector("#totalBuyinCount"),
-    totalStartPoints: document.querySelector("#totalStartPoints") || document.querySelector("#totalBuyinMoney"),
-    totalFinalPoints: document.querySelector("#totalFinalPoints") || document.querySelector("#totalFinalMoney"),
+    totalStartPoints: document.querySelector("#totalStartPoints"),
+    totalFinalPoints: document.querySelector("#totalFinalPoints"),
     totalDifference: document.querySelector("#totalDifference"),
     differenceMetric: document.querySelector("#differenceMetric"),
     historyActiveSessions: document.querySelector("#historyActiveSessions"),
     historyBuyinCount: document.querySelector("#historyBuyinCount"),
-    historyStartPoints: document.querySelector("#historyStartPoints") || document.querySelector("#historyBuyinMoney"),
-    historyFinalPoints: document.querySelector("#historyFinalPoints") || document.querySelector("#historyFinalMoney"),
+    historyStartPoints: document.querySelector("#historyStartPoints"),
+    historyFinalPoints: document.querySelector("#historyFinalPoints"),
     historyDifference: document.querySelector("#historyDifference"),
     historyDifferenceMetric: document.querySelector("#historyDifferenceMetric"),
     personStatsBody: document.querySelector("#personStatsBody"),
     personStatsEmpty: document.querySelector("#personStatsEmpty"),
     historyBody: document.querySelector("#historyBody"),
-    historyEmpty: document.querySelector("#historyEmpty")
+    historyEmpty: document.querySelector("#historyEmpty"),
+    sessionDetailModal: document.querySelector("#sessionDetailModal"),
+    modalTitle: document.querySelector("#modalTitle"),
+    modalBody: document.querySelector("#modalBody"),
+    closeModalBtn: document.querySelector("#closeModalBtn")
   };
 
   let state = {
@@ -49,6 +58,7 @@
   async function apiRequest(path, options) {
     const response = await fetch(API_BASE + "/" + path, {
       headers: { "Content-Type": "application/json" },
+      cache: "no-store",
       ...options
     });
     const data = await response.json().catch(() => ({}));
@@ -73,6 +83,11 @@
     return Number.isFinite(number) ? number : 0;
   }
 
+  function getEffectiveBuyinValue(session) {
+    const val = toNumber(session.buyinValue);
+    return val > 0 ? val : DEFAULT_BUYIN_VALUE;
+  }
+
   function points(value) {
     return currency.format(Math.round(value)) + " điểm";
   }
@@ -81,24 +96,20 @@
     if (value < 0) {
       return "Dư - " + points(Math.abs(value));
     }
-
     if (value > 0) {
       return "Thiếu - " + points(value);
     }
-
     return points(0);
   }
 
   function playerResultText(value) {
     if (value > 0) {
-      return "Lời " + points(value);
+      return "Húp " + points(value);
     }
-
     if (value < 0) {
-      return "Lỗ " + points(Math.abs(value));
+      return "Toang " + points(Math.abs(value));
     }
-
-    return "Huề";
+    return "Vui vẻ";
   }
 
   function setBalanceClasses(element, value) {
@@ -122,10 +133,7 @@
   }
 
   function formatDate(value) {
-    if (!value) {
-      return "";
-    }
-
+    if (!value) return "";
     const [year, month, day] = value.split("-");
     return [day, month, year].filter(Boolean).join("/");
   }
@@ -152,14 +160,29 @@
       elements.playerBuyins,
       elements.addPlayerBtn,
       elements.addTigerRiceBtn,
-      elements.clearSessionBtn
+      elements.clearSessionBtn,
+      elements.endSessionBtn
     ].forEach((element) => {
-      element.disabled = isBusy;
+      if (element) element.disabled = isBusy;
     });
   }
 
   function showError(error) {
     alert(error.message || "Có lỗi xảy ra");
+  }
+
+  // --- Lượt khởi động explanation ---
+  function buyinExplanation(buyins, buyinValue) {
+    const effectiveValue = buyinValue > 0 ? buyinValue : DEFAULT_BUYIN_VALUE;
+    const startPoints = buyins * effectiveValue;
+    // buyins positive => negative start (player owes), buyins negative => positive (player credited)
+    if (buyins > 0) {
+      return buyins + " lượt = -" + currency.format(startPoints) + " điểm";
+    }
+    if (buyins < 0) {
+      return buyins + " lượt = +" + currency.format(Math.abs(startPoints)) + " điểm";
+    }
+    return "0 lượt = 0 điểm";
   }
 
   async function loadSessions() {
@@ -174,7 +197,7 @@
           body: JSON.stringify({
             name: "Phiên " + new Date().toLocaleString("vi-VN"),
             date: today(),
-            buyinValue: 0
+            buyinValue: DEFAULT_BUYIN_VALUE
           })
         });
         state.sessions = [created.session];
@@ -193,9 +216,7 @@
 
   function render() {
     const session = activeSession();
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     localStorage.setItem(ACTIVE_SESSION_KEY, session.id);
     renderSessionSelect(session.id);
@@ -209,7 +230,6 @@
 
   function renderSessionSelect(activeId) {
     elements.sessionSelect.innerHTML = "";
-
     state.sessions
       .slice()
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
@@ -225,6 +245,7 @@
   function renderPlayers(session) {
     elements.playersBody.innerHTML = "";
     elements.emptyState.hidden = session.players.length > 0;
+    const effectiveBuyin = getEffectiveBuyinValue(session);
 
     session.players.forEach((player) => {
       const row = elements.rowTemplate.content.firstElementChild.cloneNode(true);
@@ -232,6 +253,10 @@
       const nameInput = row.querySelector(".name-input");
       const buyinsInput = row.querySelector(".buyins-input");
       const finalInput = row.querySelector(".final-input");
+      const buyinsMinus = row.querySelector(".buyins-minus");
+      const buyinsPlus = row.querySelector(".buyins-plus");
+      const finalMinus = row.querySelector(".final-minus");
+      const finalPlus = row.querySelector(".final-plus");
 
       nameInput.value = player.name;
       buyinsInput.value = player.buyins;
@@ -239,21 +264,54 @@
       updateRowTotals(row, player, session);
 
       nameInput.addEventListener("input", () => updatePlayer(player.id, { name: nameInput.value }, row));
-      buyinsInput.addEventListener("input", () => updatePlayer(player.id, { buyins: toNumber(buyinsInput.value) }, row));
-      finalInput.addEventListener("input", () => updatePlayer(player.id, { finalAmount: toNumber(finalInput.value) }, row));
-      row.querySelector(".delete-player").addEventListener("click", () => deletePlayer(player.id));
+      buyinsInput.addEventListener("input", () => {
+        updatePlayer(player.id, { buyins: toNumber(buyinsInput.value) }, row);
+      });
+      finalInput.addEventListener("input", () => {
+        updatePlayer(player.id, { finalAmount: toNumber(finalInput.value) }, row);
+      });
 
+      // Stepper buttons for buyins (with confirm)
+      buyinsMinus.addEventListener("click", () => {
+        const currentVal = toNumber(buyinsInput.value);
+        const newVal = currentVal - 1;
+        if (!confirm("Giảm lượt khởi động từ " + currentVal + " xuống " + newVal + "?")) return;
+        buyinsInput.value = newVal;
+        updatePlayer(player.id, { buyins: newVal }, row);
+      });
+      buyinsPlus.addEventListener("click", () => {
+        const currentVal = toNumber(buyinsInput.value);
+        const newVal = currentVal + 1;
+        if (!confirm("Tăng lượt khởi động từ " + currentVal + " lên " + newVal + "?")) return;
+        buyinsInput.value = newVal;
+        updatePlayer(player.id, { buyins: newVal }, row);
+      });
+
+      // Stepper buttons for final points
+      finalMinus.addEventListener("click", () => {
+        const newVal = toNumber(finalInput.value) - FINAL_STEP;
+        finalInput.value = newVal;
+        updatePlayer(player.id, { finalAmount: newVal }, row);
+      });
+      finalPlus.addEventListener("click", () => {
+        const newVal = toNumber(finalInput.value) + FINAL_STEP;
+        finalInput.value = newVal;
+        updatePlayer(player.id, { finalAmount: newVal }, row);
+      });
+
+      row.querySelector(".delete-player").addEventListener("click", () => deletePlayer(player.id));
       elements.playersBody.append(row);
     });
   }
 
   function sessionTotals(session) {
+    const effectiveBuyin = getEffectiveBuyinValue(session);
     return session.players.reduce(
       (sum, player) => {
         const buyins = toNumber(player.buyins);
         sum.players += 1;
         sum.buyinCount += buyins;
-        sum.startPoints += buyins * toNumber(session.buyinValue);
+        sum.startPoints += buyins * effectiveBuyin;
         sum.finalPoints += toNumber(player.finalAmount);
         return sum;
       },
@@ -262,14 +320,16 @@
   }
 
   function updateRowTotals(row, player, session) {
-    const startPoints = toNumber(player.buyins) * toNumber(session.buyinValue);
+    const effectiveBuyin = getEffectiveBuyinValue(session);
+    const startPoints = toNumber(player.buyins) * effectiveBuyin;
     const finalPoints = toNumber(player.finalAmount);
     const result = finalPoints - startPoints;
     const resultCell = row.querySelector(".result-cell");
+    const startPointsCell = row.querySelector(".start-points");
 
-    const startPointsCell = row.querySelector(".start-points") || row.querySelector(".buyin-money");
     if (startPointsCell) {
       startPointsCell.textContent = points(startPoints);
+      startPointsCell.title = buyinExplanation(toNumber(player.buyins), effectiveBuyin);
     }
     resultCell.textContent = playerResultText(result);
     setResultClasses(resultCell, result);
@@ -316,11 +376,10 @@
     const stats = new Map();
 
     sessions.forEach((session) => {
+      const effectiveBuyin = getEffectiveBuyinValue(session);
       session.players.forEach((player) => {
         const key = playerKeyword(player.name);
-        if (!key) {
-          return;
-        }
+        if (!key) return;
 
         if (!stats.has(key)) {
           stats.set(key, {
@@ -336,7 +395,7 @@
         const buyins = toNumber(player.buyins);
         item.aliases.add(player.name.trim());
         item.buyinCount += buyins;
-        item.startPoints += buyins * toNumber(session.buyinValue);
+        item.startPoints += buyins * effectiveBuyin;
         item.finalPoints += toNumber(player.finalAmount);
       });
     });
@@ -395,6 +454,12 @@
       const actions = document.createElement("div");
       actions.className = "row-actions";
 
+      const detailButton = document.createElement("button");
+      detailButton.type = "button";
+      detailButton.className = "ghost";
+      detailButton.textContent = "Chi tiết";
+      detailButton.addEventListener("click", () => showSessionDetail(session));
+
       const editButton = document.createElement("button");
       editButton.type = "button";
       editButton.className = "ghost";
@@ -411,7 +476,7 @@
       visibilityButton.textContent = session.deletedAt ? "Khôi phục" : "Xóa";
       visibilityButton.addEventListener("click", () => toggleSessionVisibility(session.id, !session.deletedAt));
 
-      actions.append(editButton, visibilityButton);
+      actions.append(detailButton, editButton, visibilityButton);
 
       row.children[0].textContent = formatDate(session.date);
       row.children[1].textContent = session.name || "Phiên không tên";
@@ -425,10 +490,86 @@
     });
   }
 
+  // --- Session detail modal ---
+  function showSessionDetail(session) {
+    const effectiveBuyin = getEffectiveBuyinValue(session);
+    const totals = sessionTotals(session);
+    const difference = totals.finalPoints - totals.startPoints;
+
+    elements.modalTitle.textContent = "Chi tiết: " + (session.name || "Phiên không tên");
+
+    let html = `
+      <div class="detail-info">
+        <p><strong>Ngày:</strong> ${formatDate(session.date)}</p>
+        <p><strong>Hệ số 1 lượt:</strong> ${currency.format(effectiveBuyin)} điểm</p>
+        <p><strong>Tổng người chơi:</strong> ${totals.players}</p>
+        <p><strong>Tổng lượt khởi động:</strong> ${totals.buyinCount}</p>
+        <p><strong>Tổng điểm đầu:</strong> ${points(totals.startPoints)}</p>
+        <p><strong>Tổng điểm chốt:</strong> ${points(totals.finalPoints)}</p>
+        <p><strong>Chênh lệch (chốt - đầu):</strong> <span class="${difference > 0 ? 'negative' : difference < 0 ? 'surplus' : ''}">${balanceText(difference)}</span></p>
+        <p><strong>Trạng thái:</strong> ${session.deletedAt ? "Đã ẩn" : "Đang tính"}</p>
+      </div>
+    `;
+
+    if (session.players.length > 0) {
+      html += `<table class="detail-table"><thead><tr>
+        <th>Tên</th><th>Lượt</th><th>Điểm đầu</th><th>Điểm chốt</th><th>Kết quả</th>
+      </tr></thead><tbody>`;
+
+      let totalProfit = 0;
+      let totalLoss = 0;
+
+      session.players.forEach((player) => {
+        const buyins = toNumber(player.buyins);
+        const startPts = buyins * effectiveBuyin;
+        const finalPts = toNumber(player.finalAmount);
+        const result = finalPts - startPts;
+        const resultClass = result > 0 ? "positive" : result < 0 ? "negative" : "";
+        if (result > 0) totalProfit += result;
+        if (result < 0) totalLoss += Math.abs(result);
+        html += `<tr>
+          <td>${escapeHtml(player.name)}</td>
+          <td>${buyins}</td>
+          <td>${points(startPts)}</td>
+          <td>${points(finalPts)}</td>
+          <td class="result-cell ${resultClass}">${playerResultText(result)}</td>
+        </tr>`;
+      });
+
+      html += `</tbody><tfoot><tr class="detail-summary-row">
+        <td colspan="4"><strong>Toang tổng:</strong></td>
+        <td class="result-cell positive"><strong>${points(totalProfit)}</strong></td>
+      </tr><tr class="detail-summary-row">
+        <td colspan="4"><strong>Húp tổng:</strong></td>
+        <td class="result-cell negative"><strong>${points(totalLoss)}</strong></td>
+      </tr></tfoot></table>`;
+    } else {
+      html += '<p class="empty-state">Không có người chơi trong phiên này.</p>';
+    }
+
+    elements.modalBody.innerHTML = html;
+    elements.sessionDetailModal.showModal();
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   async function addPlayer() {
     const session = activeSession();
     const name = elements.playerName.value.trim();
     if (!session || !name) {
+      elements.playerName.focus();
+      return;
+    }
+
+    // Kiểm tra trùng tên
+    const nameKey = playerKeyword(name);
+    const duplicate = session.players.find((p) => playerKeyword(p.name) === nameKey);
+    if (duplicate) {
+      alert("Người chơi \"" + duplicate.name + "\" đã có trong phiên này.");
       elements.playerName.focus();
       return;
     }
@@ -461,9 +602,7 @@
 
   async function addPresetPlayers() {
     const session = activeSession();
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     const names = [
       "Gá Việt",
@@ -476,7 +615,6 @@
     elements.addTigerRiceBtn.disabled = true;
     try {
       const createdPlayers = [];
-
       for (const name of names) {
         const data = await apiRequest("players.php", {
           method: "POST",
@@ -487,14 +625,9 @@
             finalAmount: 0
           })
         });
-
-        if (!data.player) {
-          throw new Error("Không tạo được người chơi: " + name);
-        }
-
+        if (!data.player) throw new Error("Không tạo được người chơi: " + name);
         createdPlayers.push(data.player);
       }
-
       session.players.push(...createdPlayers);
       render();
     } catch (error) {
@@ -506,9 +639,7 @@
 
   function updateSession(patch) {
     const session = activeSession();
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     Object.assign(session, patch);
     renderSessionSelect(session.id);
@@ -537,9 +668,7 @@
   function updatePlayer(playerId, patch, row) {
     const session = activeSession();
     const player = session.players.find((item) => String(item.id) === String(playerId));
-    if (!player) {
-      return;
-    }
+    if (!player) return;
 
     Object.assign(player, patch);
     updateRowTotals(row, player, session);
@@ -583,13 +712,9 @@
 
   async function toggleSessionVisibility(sessionId, shouldHide) {
     const session = state.sessions.find((item) => String(item.id) === String(sessionId));
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
-    if (shouldHide && !confirm("Ẩn phiên này khỏi thống kê? Dữ liệu vẫn được giữ để khôi phục.")) {
-      return;
-    }
+    if (shouldHide && !confirm("Ẩn phiên này khỏi thống kê? Dữ liệu vẫn được giữ để khôi phục.")) return;
 
     try {
       await apiRequest("sessions.php", {
@@ -603,6 +728,54 @@
     }
   }
 
+  // --- End session: save current & create new blank session ---
+  async function endSession() {
+    const session = activeSession();
+    if (!session) return;
+
+    // Không cho kết thúc phiên nếu chưa có người chơi
+    if (session.players.length === 0) {
+      alert("Phiên chưa có người chơi, không cần kết thúc.");
+      return;
+    }
+
+    if (!confirm("Kết thúc phiên hiện tại? Dữ liệu sẽ được lưu lại và tạo phiên mới trắng.")) return;
+
+    setBusy(true);
+    try {
+      // Ensure current session is saved
+      await apiRequest("sessions.php", {
+        method: "PUT",
+        body: JSON.stringify({
+          id: session.id,
+          name: session.name,
+          date: session.date,
+          buyinValue: toNumber(session.buyinValue)
+        })
+      });
+
+      // Create new blank session
+      const data = await apiRequest("sessions.php", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Phiên " + new Date().toLocaleString("vi-VN"),
+          date: today(),
+          buyinValue: DEFAULT_BUYIN_VALUE
+        })
+      });
+      state.sessions.push(data.session);
+      state.activeSessionId = data.session.id;
+      render();
+      elements.sessionName.focus();
+      elements.sessionName.select();
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // --- Event listeners ---
   elements.newSessionBtn.addEventListener("click", async () => {
     setBusy(true);
     try {
@@ -611,7 +784,7 @@
         body: JSON.stringify({
           name: "Phiên " + new Date().toLocaleString("vi-VN"),
           date: today(),
-          buyinValue: 0
+          buyinValue: DEFAULT_BUYIN_VALUE
         })
       });
       state.sessions.push(data.session);
@@ -636,21 +809,26 @@
   elements.sessionDate.addEventListener("input", () => updateSession({ date: elements.sessionDate.value }));
   elements.addPlayerBtn.addEventListener("click", addPlayer);
   elements.addTigerRiceBtn.addEventListener("click", addPresetPlayers);
+  elements.endSessionBtn.addEventListener("click", endSession);
+
+  // Stepper for add-player buyins
+  elements.playerBuyinsMinus.addEventListener("click", () => {
+    elements.playerBuyins.value = toNumber(elements.playerBuyins.value) - 1;
+  });
+  elements.playerBuyinsPlus.addEventListener("click", () => {
+    elements.playerBuyins.value = toNumber(elements.playerBuyins.value) + 1;
+  });
+
   elements.playerName.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      addPlayer();
-    }
+    if (event.key === "Enter") addPlayer();
   });
   elements.playerBuyins.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      addPlayer();
-    }
+    if (event.key === "Enter") addPlayer();
   });
+
   elements.clearSessionBtn.addEventListener("click", async () => {
     const session = activeSession();
-    if (!session || !confirm("Xóa tất cả người chơi trong phiên này?")) {
-      return;
-    }
+    if (!session || !confirm("Xóa tất cả người chơi trong phiên này?")) return;
 
     try {
       await apiRequest("sessions.php", {
@@ -661,6 +839,16 @@
       render();
     } catch (error) {
       showError(error);
+    }
+  });
+
+  // Modal close
+  elements.closeModalBtn.addEventListener("click", () => {
+    elements.sessionDetailModal.close();
+  });
+  elements.sessionDetailModal.addEventListener("click", (e) => {
+    if (e.target === elements.sessionDetailModal) {
+      elements.sessionDetailModal.close();
     }
   });
 

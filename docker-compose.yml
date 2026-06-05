@@ -1,0 +1,35 @@
+# docker-compose.yml
+# Chạy nhiều containers cùng lúc (app + database)
+# Giống Xcode Workspace chứa nhiều projects
+
+services:
+  # Container 1: PHP App
+  app:
+    build: .                  # Build từ Dockerfile trong folder này
+    ports:
+      - "8081:80"             # localhost:8080 → container:80
+    environment:              # Env vars (giống .xcconfig)
+      - DB_HOST=db            # "db" = tên service MySQL bên dưới (Docker tự resolve)
+      - DB_NAME=pokemondb
+      - DB_USER=admin
+      - DB_PASS=localpass123
+    depends_on:               # Start MySQL trước app
+      - db
+
+  # Container 2: MySQL Database
+  db:
+    image: mysql:8.0          # Dùng image có sẵn từ Docker Hub (không cần Dockerfile)
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=pokemondb     # Tự tạo database khi first boot
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=localpass123
+    volumes:
+      - db_data:/var/lib/mysql                              # Persist data
+      - ./database.sql:/docker-entrypoint-initdb.d/init.sql # Auto import SQL!
+    ports:
+      - "3307:3307"           # Optional: connect từ DBeaver/TablePlus
+
+# Volume = persistent storage (data không mất khi container restart)
+volumes:
+  db_data:

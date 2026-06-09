@@ -1,0 +1,7 @@
+.git
+.DS_Store
+node_modules
+docker-compose.yml
+*.md
+*.sql
+Archive.zip

@@ -7,7 +7,7 @@ ECR_URL="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/pokemon-app"
 TAG=${1:-latest}  # Dùng argument đầu tiên hoặc "latest"
 
 echo "Building image..."
-docker build -t pokemon-app:$TAG .
+docker build --platform linux/amd64 -t pokemon-app:$TAG .
 
 echo "Logging into ECR..."
 aws ecr get-login-password --region $AWS_REGION | \
